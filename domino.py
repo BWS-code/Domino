@@ -19,11 +19,10 @@ if randint(1, 2) == 2:
 
 stock = stock[on_hands * 2 - 1:]
 
-next_one = 'computer' if len(computer) > len(player) else 'player'
-
-print('Stock pieces: {}\n\
-    Computer pieces: {}\n\
-      Player pieces: {}\n\
-      Domino snake: [{}]\n\
-             Status: {}'.\
-             format(stock, computer, player, snake, next_one))
+print('=' * ord('F'))
+print('Stock size: %s\nComputer pieces: %s\n\n%s\n' % (len(stock), len(computer), snake))
+print('Your pieces:\n{}'.format('\n'.join(list(f'{i + 1}:{e}' for i, e \
+                                               in enumerate(list(map(str, ([pcs for pcs in player]))))))))
+print(''.join(chr(n) for n in [83, 116, 97, 116, 117, 115, 58]), end=' ')
+print('Computer is about to make a move. Press Enter to continue...' if len(computer) > len(player) else \
+      'It\'s your turn to make a move. Enter your command.')
