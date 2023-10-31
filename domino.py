@@ -1,115 +1,91 @@
-from random import choice, choices, shuffle
-
-
-class BadInputError(Exception):
-    def __init__(self, range_):
-        self.range_ = range_
-
-    def __str__(self):
-        return f'Invalid input. Please try again. Expected nums in range: {self.range_}'
-
-
-class IllegalMoveError(Exception):
-    def __init__(self, options):
-        self.message = f'Illegal move. Please try again. Valid options: {options}'
-        super().__init__(self.message)
+from random import randint as rr, shuffle, choices
 
 
 class Domino:
-    up_key, ends_criteria, ends, mask = 7, 8, 3, '...'
+    SPLT_LINE = '=' * 70
+    SERP_MASK = '...'
+    MASK_CRIT = 6
+    UPPER_KEY = 7
+    DRAW_CRIT = 8
 
     def __init__(self, hand):
         self.hand = hand
         self.player = self.computer = []
-        self.snake = choices(doubles := [[i] * 2 for i in range(self.up_key)], [2 ** i for i in range(len(doubles))])
-        self.snake_left_end = self.snake_right_end = self.snake_ends = None
-        self.stock = [[i, j] for i in range(self.up_key) for j in range(i, self.up_key) if [i, j]]
+        self.left_end = self.right_end = self.serp_ends = self.no_draw = None
+        self.serp = choices(doubles := [
+            [i] * 2 for i in range(self.UPPER_KEY)], [2 ** i for i in range(len(doubles))])
+        self.stock = [[i, j] for i in range(self.UPPER_KEY) for j in range(i, self.UPPER_KEY)]
+
+    def get_cmd(self):
+        while True:
+            try:
+                dom_num = input()
+                if not dom_num.lstrip('-').isdigit() and len(dom_num) or \
+                        abs(int(dom_num)) > len(self.player):
+                    print('Invalid input. Please try again.')
+                    continue
+                return int(dom_num)
+            except ValueError:
+                return self.get_ai_cmd()
+
+    def get_ai_cmd(self):
+        return rr(-len(self.computer), len(self.computer))
 
     def allocate(self):
-        while any(dom >= self.snake[0] for dom in self.stock[self.hand * 2:] if len(set(dom)) % 2) or \
-                self.stock.remove(self.snake[0]):
+        while any(dom >= self.serp[0] for dom in self.stock[self.hand * 2:]
+                  if len(set(dom)) == 1) or self.stock.remove(self.serp[0]):
             shuffle(self.stock)
+        self.stock, self.player, self.computer = \
+            [self.stock[:self.hand * 2]] + [self.stock[i: i + self.hand] \
+                                            for i in range(self.hand * 2, len(self.stock), self.hand)]
+        self.player, self.computer = [self.player, self.computer][::choices([-1, 1])[0]]
 
-        self.stock, self.player, self.computer = [self.stock[:self.hand * 2]] + \
-                                                 [self.stock[i:i + self.hand] for i in range(
-                                                     self.hand * 2, len(self.stock), self.hand)][::choice((-1, 1))]
+    def stats(self, playing, game, serp_end=MASK_CRIT // 2):
+        player_data = '\n'.join(f'{i}: {dom}' for i, dom in enumerate(self.player, 1))
+        print('{heading}\nStock size: {}\nComputer size: {}\n\n{serp}\n\nPlayer pieces:\n{}\n{}Status:'
+              .format(len(self.stock), len(self.computer), player_data, '\n'[:len(self.player) ^ 0],
+                      heading=self.SPLT_LINE,
+                      serp=''.join(map(str, self.serp))
+                      .replace(('-1', ''.join(map(str, self.serp[serp_end:len(self.serp) - serp_end]))
+                                )[len(self.serp) > self.MASK_CRIT], self.SERP_MASK)), end=' ')
+        if game:
+            print(('It\'s your turn to make a move. Enter your command.',
+                   'Computer is about to make a move. Press Enter to continue...'
+                   )[playing == self.computer])
+        else:
+            print(' '.join(('The game is over.', (
+                ('It\'s a draw!',) * 2, ('The computer won!', 'You won!')
+            )[self.no_draw][len(self.player) < len(self.computer)])))
 
-    def stats(self, game, curr_player):
-        print('{}\nStock size: {}\nComputer pieces: {}\n\n{}\n\nPlayer pieces:\n{}\n{}'.format(
-            '=' * ord('f'.upper()), len(self.stock), len(self.computer),
-            ''.join(map(str, self.snake)) if len(self.snake) < self.ends * 2 + 1 else
-            ''.join(map(str, self.snake)).replace(
-                ''.join(map(str, self.snake[self.ends:len(self.snake) - self.ends])), self.mask),
-            '\n'.join([f'{i}: {e}' for i, e in enumerate(self.player, 1)]),
-            '\nStatus:'), end=' ')
-        print(('Computer is about to make a move. Press Enter to continue...',
-               'It\'s your turn to make a move. Enter your command.')
-              [curr_player == self.player] if game else '\nThe game is over.', end=' ')
-
-    def get_command(self):
-        while True:
-            dom_ind = input()
-            try:
-                if not dom_ind.lstrip('-').isdigit() and len(dom_ind) or abs(int(dom_ind)) > len(self.player):
-                    raise BadInputError(f'{-len(self.player)}...{len(self.player)}')
-                dom_ind = int(dom_ind)
-                if dom_ind > 0 and self.snake_right_end not in self.player[dom_ind - 1] or \
-                        dom_ind < 0 and self.snake_left_end not in self.player[abs(dom_ind) - 1]:
-                    user_options = [
-                        [str(opt) for opt in self.player if set(opt) & {snake_end}] for snake_end in self.snake_ends]
-                    raise IllegalMoveError(f'{" ".join(user_options[0]) or None} < left | '
-                                           f'right > {" ".join(user_options[1]) or None}')
-            except (BadInputError, IllegalMoveError) as err:
-                print(err); continue
-            except ValueError:
-                return self.get_ai_command()
-            return dom_ind
-
-    def make_move(self, playing, dom_ind):
-        if dom_ind:
-            self.snake.insert((0, len(self.snake))[dom_ind > 0], self.flip(playing.pop(abs(dom_ind) - 1), dom_ind))
-            return
-        if self.stock:
+    def make_move(self, playing, dom_num):
+        if dom_num:
+            self.serp.insert((0, len(self.serp))[dom_num > 0], playing.pop(abs(dom_num) - 1))
+        elif self.stock:
             playing.append(self.stock.pop())
 
-    def flip(self, dom, dom_ind):
-        if dom_ind > 0 and self.snake_right_end != dom[0] or dom_ind < 0 and self.snake_left_end != dom[1]:
-            return dom[::-1]
-        return dom
-
-    def get_ai_command(self):
-        ai_options = [opt for opt in self.computer if set(opt) & set(self.snake_ends)]
-        if ai_options:
-            ai_choice: list = choice(ai_options)
-            any_side: bool = sum(self.snake_ends.count(x) for x in set(ai_choice)) == 2
-            ai_dom_ind: int = self.computer.index(ai_choice) + 1
-            ai_dom_ind *= [(-1, 1), (choice((-1, 1)),) * 2][any_side][self.snake_right_end in ai_choice]
-        else:
-            ai_dom_ind = 0
-        return ai_dom_ind
-
-    def update_snake_ends(self):
-        self.snake_left_end, *_, self.snake_right_end = sum(self.snake, [])
-        self.snake_ends = [self.snake_left_end, self.snake_right_end]
-
     def check_game_status(self):
-        criteria = (-1, self.snake_left_end)[len({self.snake_right_end, self.snake_left_end}) % 2]
-        ends_less_8: bool = sum(self.snake, []).count(criteria) < self.ends_criteria
-        return all((self.computer, self.player, ends_less_8))
+        crit = (-1, self.left_end)[len({self.left_end, self.right_end}) % 2]
+        self.no_draw = sum(self.serp, []).count(crit) < self.DRAW_CRIT
+        return all((self.player, self.computer, self.no_draw))
 
-    def main(self, game=True):
+    def update_serp_ends(self):
+        self.left_end, *_, self.right_end = sum(self.serp, [])
+        self.serp_ends = self.left_end, self.right_end
+
+    def run(self, game=True):
         self.allocate()
         curr_player = (self.player, self.computer)[len(self.player) < len(self.computer)]
+
         while game:
-            self.update_snake_ends()
-            self.stats(game, curr_player)
-            self.make_move(playing=curr_player, dom_ind=self.get_command())
-            curr_player = (self.player, self.computer)[curr_player == self.player]
+            self.stats(curr_player, game)
+
+            self.make_move(playing=curr_player, dom_num=self.get_cmd())
+            self.update_serp_ends()
             game = self.check_game_status()
-        self.stats(game, curr_player)
-        print((('You won!!', 'The computer won!'), ('It\'s a draw!',) * 2)
-              [all((self.computer, self.player))][curr_player == self.player])
+
+            curr_player = (self.player, self.computer)[curr_player == self.player]
+        self.stats(curr_player, game)
 
 
 my_game = Domino(7)
-my_game.main()
+my_game.run()
