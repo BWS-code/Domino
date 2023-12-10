@@ -42,7 +42,7 @@ class Domino:
                 if playing is self.player and not all((len(dom_num), dom_num.lstrip('-').isdigit())) or \
                         abs(int(dom_num)) > len(self.player):
                     raise BadInputError(len(self.player))
-                if not set(self.player[abs(int(dom_num)) - 1]) & {[*self.serp_ends][int(dom_num) > 0]} and \
+                if not set(self.player[abs(int(dom_num)) - 1]) & {self.serp_ends[int(dom_num) > 0]} and \
                         dom_num != '0':
                     valid = [[dom for dom in self.player if set(dom) & {dom_end}] for dom_end in self.serp_ends]
                     raise IllegalMoveError(valid, self.serp_ends)
